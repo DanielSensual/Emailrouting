@@ -1,0 +1,95 @@
+// Prisma Schema for Email Relay System
+// Supports SQLite (dev) and PostgreSQL (prod)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// DEAD-LETTER QUEUE
+// ============================================
+
+// Status values: PROCESSING, SUCCESS, FAILED
+// (SQLite doesn't support enums, so we use String)
+
+model ProcessedMessage {
+  messageId     String   @id
+  status        String   @default("PROCESSING") // PROCESSING | SUCCESS | FAILED
+  attempts      Int           @default(0)
+  errorLog      String?
+  lastAttemptAt DateTime?
+  processedAt   DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([status])
+  @@index([lastAttemptAt])
+}
+
+// ============================================
+// LEADS
+// ============================================
+
+model Lead {
+  id              String    @id @default(cuid())
+  email           String    @unique
+  firstName       String?
+  lastName        String?
+  phone           String?
+  source          String?   // zillow, realtor, facebook, generic
+  sourceMessage   String?   // Gmail message ID
+  
+  // Assignment
+  assignedAgentId String?
+  assignedAgent   Agent?    @relation(fields: [assignedAgentId], references: [id])
+  assignedAt      DateTime?
+  
+  // Reply tracking (idempotency)
+  replySentAt     DateTime?
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([assignedAgentId])
+  @@index([createdAt])
+}
+
+// ============================================
+// AGENTS (for round-robin assignment)
+// ============================================
+
+model Agent {
+  id             String    @id @default(cuid())
+  name           String
+  email          String    @unique
+  phone          String?
+  bookingUrl     String?
+  isActive       Boolean   @default(true)
+  
+  // Round-robin tracking
+  lastAssignedAt DateTime  @default(now())
+  assignedCount  Int       @default(0)
+  
+  leads          Lead[]
+  
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([isActive, lastAssignedAt])
+}
+
+// ============================================
+// CONCURRENCY LOCK
+// ============================================
+
+model SystemLock {
+  name      String   @id
+  lockedBy  String?  // worker identifier
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
