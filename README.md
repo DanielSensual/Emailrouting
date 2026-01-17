@@ -1,6 +1,6 @@
 # Email Relay System
 
-A production-grade email relay system for processing leads via Gmail API. Automatically parses incoming lead emails, assigns agents via round-robin, and sends personalized responses.
+> ⚠️ **STATUS: NOT ACTIVE** - Setup required before use. See [SETUP_REQUIRED.md](./SETUP_REQUIRED.md)
 
 ## Features
 
